@@ -147,6 +147,24 @@ def extract_markets(stream):
             yield market
 
 
+def to_market_summary(stream):
+    """
+    Transform market objects to simplified summary containers.
+    
+    Args:
+        stream: Stream of market objects
+    
+    Yields:
+        Dicts with only the fields we care about
+    """
+    for market in stream:
+        yield {
+            "event_ticker": market.get("event_ticker"),
+            "last_price": market.get("last_price"),
+            "title": market.get("title")
+        }
+
+
 def is_sports_event(event):
     """Check if event is in Sports category."""
     return event.get("category") == "Sports"
@@ -154,13 +172,14 @@ def is_sports_event(event):
 
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
-    MAX_EVENTS = 10
+    MAX_EVENTS = 100
     
     stream = stream_from_events_list()
     stream = filter(stream, is_sports_event)
     stream = limit(stream, limit=MAX_EVENTS)
     stream = enrich_with_details(stream, with_nested_markets=True)
     stream = extract_markets(stream)
+    stream = to_market_summary(stream)
     
     for market in stream:
         print(json.dumps(market, indent=2))
