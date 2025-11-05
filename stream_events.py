@@ -153,23 +153,23 @@ def extract_markets(stream):
             yield enriched_market
 
 
-def to_market_summary(stream):
+def to_summary(stream, summary_fields):
     """
-    Transform market objects to simplified summary containers.
+    Transform objects to simplified summary containers with specified fields.
     
     Args:
-        stream: Stream of market objects
+        stream: Input stream/iterable
+        summary_fields: Dict mapping output field names to input field names
+                        e.g. {"output_name": "input_name"}
     
     Yields:
-        Dicts with only the fields we care about
+        Dicts with only the specified fields
     """
-    for market in stream:
-        yield {
-            "event_ticker": market.get("event_ticker"),
-            "category": market.get("event_category"),
-            "last_price": market.get("last_price"),
-            "title": market.get("title")
-        }
+    for item in stream:
+        summary = {}
+        for output_field, input_field in summary_fields.items():
+            summary[output_field] = item.get(input_field)
+        yield summary
 
 
 def is_sports_event(event):
@@ -179,15 +179,24 @@ def is_sports_event(event):
 
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
-    # MAX_EVENTS = 100
-    MAX_EVENTS = 1
+    MAX_EVENTS = 100
+    # MAX_EVENTS = 1
+    
+    # Define which fields we want in our summary
+    market_fields = {
+        "event_ticker": "event_ticker",
+        "market_ticker": "ticker",
+        "category": "event_category",
+        "last_price": "last_price",
+        "title": "title"
+    }
     
     stream = stream_from_events_list()
     stream = filter(stream, is_sports_event)
     stream = limit(stream, limit=MAX_EVENTS)
     stream = enrich_with_details(stream, with_nested_markets=True)
     stream = extract_markets(stream)
-    stream = to_market_summary(stream)
+    stream = to_summary(stream, summary_fields=market_fields)
     
     for market in stream:
         print(json.dumps(market, indent=2))
