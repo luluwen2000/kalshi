@@ -1,4 +1,5 @@
 import requests
+import json
 
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2/events"
 
@@ -44,6 +45,23 @@ def filter_events(event_stream, predicate):
             yield event
 
 
+def limit_events(event_stream, limit=None):
+    """
+    Limit the number of events from a stream.
+    
+    Args:
+        event_stream: An iterable/generator of events
+        limit: Maximum number of events to yield (None for unlimited)
+    """
+    if limit is None:
+        yield from event_stream
+    else:
+        for i, event in enumerate(event_stream):
+            if i >= limit:
+                break
+            yield event
+
+
 def is_sports(event):
     """Predicate to check if an event is in the Sports category."""
     return event.get("category") == "Sports"
@@ -58,6 +76,12 @@ def stream_sports_events():
 
 
 if __name__ == "__main__":
-    # print only sports events
-    for event in stream_sports_events():
-        print(event)
+    # Configure how many events to print (None for all)
+    MAX_EVENTS = 1
+    
+    # Compose: stream sports events with a limit
+    events = limit_events(stream_sports_events(), limit=MAX_EVENTS)
+    
+    for event in events:
+        print(json.dumps(event, indent=2))
+        print()  # blank line between events
