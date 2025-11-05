@@ -180,7 +180,6 @@ def is_sports_event(event):
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
     MAX_EVENTS = 100
-    # MAX_EVENTS = 1
     
     # Define which fields we want in our summary
     market_fields = {
@@ -188,7 +187,9 @@ if __name__ == "__main__":
         "market_ticker": "ticker",
         "category": "event_category",
         "last_price": "last_price",
-        "title": "title"
+        "title": "title",
+        "yes_sub_title": "yes_sub_title",
+        "no_sub_title": "no_sub_title"
     }
     
     stream = stream_from_events_list()
