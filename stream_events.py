@@ -127,6 +127,26 @@ def map(stream, transform_fn):
     for item in stream:
         yield transform_fn(item)
 
+
+def extract_markets(stream):
+    """
+    Extract markets from event stream.
+    Flattens the stream so each market becomes a separate item.
+    
+    Args:
+        stream: Stream of events with markets field
+    
+    Yields:
+        Individual market objects
+    """
+    for item in stream:
+        # Handle both nested and top-level markets
+        event_data = item.get("event", item)
+        markets = event_data.get("markets", [])
+        for market in markets:
+            yield market
+
+
 def is_sports_event(event):
     """Check if event is in Sports category."""
     return event.get("category") == "Sports"
@@ -140,7 +160,8 @@ if __name__ == "__main__":
     stream = filter(stream, is_sports_event)
     stream = limit(stream, limit=MAX_EVENTS)
     stream = enrich_with_details(stream, with_nested_markets=True)
+    stream = extract_markets(stream)
     
-    for event in stream:
-        print(json.dumps(event, indent=2))
+    for market in stream:
+        print(json.dumps(market, indent=2))
         print()
