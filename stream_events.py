@@ -30,7 +30,34 @@ def stream_events():
             break  # no more pages
 
 
+def filter_events(event_stream, predicate):
+    """
+    Generic filter for event streams.
+    Yields only events that match the given predicate function.
+    
+    Args:
+        event_stream: An iterable/generator of events
+        predicate: A function that takes an event and returns True/False
+    """
+    for event in event_stream:
+        if predicate(event):
+            yield event
+
+
+def is_sports(event):
+    """Predicate to check if an event is in the Sports category."""
+    return event.get("category") == "Sports"
+
+
+def stream_sports_events():
+    """
+    Generator that streams only Sports category events from Kalshi.
+    Composed from stream_events() and filter_events().
+    """
+    return filter_events(stream_events(), is_sports)
+
+
 if __name__ == "__main__":
-    # simple demo: print them all
-    for event in stream_events():
+    # print only sports events
+    for event in stream_sports_events():
         print(event)
