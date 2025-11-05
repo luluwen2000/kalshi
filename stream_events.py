@@ -132,19 +132,25 @@ def extract_markets(stream):
     """
     Extract markets from event stream.
     Flattens the stream so each market becomes a separate item.
+    Preserves event-level data (like category) by adding it to each market.
     
     Args:
         stream: Stream of events with markets field
     
     Yields:
-        Individual market objects
+        Individual market objects enriched with event data
     """
     for item in stream:
         # Handle both nested and top-level markets
         event_data = item.get("event", item)
         markets = event_data.get("markets", [])
+        event_category = event_data.get("category")
+        
         for market in markets:
-            yield market
+            # Enrich market with event-level data
+            enriched_market = dict(market)
+            enriched_market["event_category"] = event_category
+            yield enriched_market
 
 
 def to_market_summary(stream):
@@ -160,6 +166,7 @@ def to_market_summary(stream):
     for market in stream:
         yield {
             "event_ticker": market.get("event_ticker"),
+            "category": market.get("event_category"),
             "last_price": market.get("last_price"),
             "title": market.get("title")
         }
@@ -172,7 +179,8 @@ def is_sports_event(event):
 
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
-    MAX_EVENTS = 100
+    # MAX_EVENTS = 100
+    MAX_EVENTS = 1
     
     stream = stream_from_events_list()
     stream = filter(stream, is_sports_event)
