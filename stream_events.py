@@ -127,11 +127,6 @@ def map(stream, transform_fn):
     for item in stream:
         yield transform_fn(item)
 
-
-# ============================================================================
-# PREDICATES - Reusable filter conditions
-# ============================================================================
-
 def is_sports_event(event):
     """Check if event is in Sports category."""
     return event.get("category") == "Sports"
