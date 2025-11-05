@@ -177,9 +177,29 @@ def is_sports_event(event):
     return event.get("category") == "Sports"
 
 
+def is_event_ticker(ticker):
+    """
+    Create a predicate to filter by specific event ticker.
+    
+    Args:
+        ticker: The event ticker to match (None to match all events)
+    
+    Returns:
+        A predicate function that checks if event matches the ticker
+    """
+    def predicate(event):
+        if ticker is None:
+            return True
+        return event.get("event_ticker") == ticker
+    return predicate
+
+
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
     MAX_EVENTS = 100
+    
+    # Filter for specific event ticker
+    TARGET_EVENT_TICKER = "KXNBAGAME-25NOV04OKCLAC"
     
     # Define which fields we want in our summary
     market_fields = {
@@ -194,10 +214,11 @@ if __name__ == "__main__":
     
     stream = stream_from_events_list()
     stream = filter(stream, is_sports_event)
+    stream = filter(stream, is_event_ticker(TARGET_EVENT_TICKER))
     stream = limit(stream, limit=MAX_EVENTS)
     stream = enrich_with_details(stream, with_nested_markets=True)
     stream = extract_markets(stream)
-    stream = to_summary(stream, summary_fields=market_fields)
+    # stream = to_summary(stream, summary_fields=market_fields)
     
     for market in stream:
         print(json.dumps(market, indent=2))
