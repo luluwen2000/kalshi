@@ -4,16 +4,35 @@ import json
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2/events"
 
 
-def fetch_event_by_ticker(event_ticker, with_nested_markets=False):
+# ============================================================================
+# FETCH FUNCTIONS - Get data from URLs
+# ============================================================================
+
+def fetch_from_events_list(cursor=None):
     """
-    Fetch detailed event data by event ticker.
+    FETCH from URL_A: /events endpoint (paginated list of all events).
+    
+    Returns:
+        Response JSON with events array and cursor
+    """
+    params = {}
+    if cursor:
+        params["cursor"] = cursor
+    resp = requests.get(BASE_URL, params=params, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_from_event_detail(event_ticker, with_nested_markets=False):
+    """
+    FETCH from URL_B: /events/{event_ticker} endpoint (detailed event data).
     
     Args:
         event_ticker: The event ticker to fetch
         with_nested_markets: If true, include markets within the event object
     
     Returns:
-        Full event data from the API
+        Response JSON with detailed event data
     """
     url = f"{BASE_URL}/{event_ticker}"
     params = {}
@@ -25,108 +44,108 @@ def fetch_event_by_ticker(event_ticker, with_nested_markets=False):
     return resp.json()
 
 
-def fetch_page(cursor=None):
-    """Fetch one page from Kalshi /events."""
-    params = {}
-    if cursor:
-        params["cursor"] = cursor
-    resp = requests.get(BASE_URL, params=params, timeout=10)
-    resp.raise_for_status()
-    return resp.json()
+# ============================================================================
+# STREAM FUNCTIONS - Transform fetched data into streams
+# ============================================================================
 
-
-def stream_events():
+def stream_from_events_list():
     """
-    Generator that keeps pulling pages and yielding individual events.
-    Stops when the API stops giving a cursor.
+    Stream events from paginated /events endpoint.
+    Handles pagination automatically, yielding events one by one.
     """
     cursor = None
     while True:
-        data = fetch_page(cursor)
+        data = fetch_from_events_list(cursor)
         events = data.get("events", [])
-        for ev in events:
-            yield ev
+        for event in events:
+            yield event
 
         cursor = data.get("cursor")
         if not cursor:
-            break  # no more pages
+            break
 
 
-def filter_events(event_stream, predicate):
+# ============================================================================
+# TRANSFORMATION STEPS - Process stream data
+# ============================================================================
+
+def filter(stream, predicate):
     """
-    Generic filter for event streams.
-    Yields only events that match the given predicate function.
+    Filter stream by predicate.
     
     Args:
-        event_stream: An iterable/generator of events
-        predicate: A function that takes an event and returns True/False
+        stream: Input stream/iterable
+        predicate: Function that returns True/False for each item
     """
-    for event in event_stream:
-        if predicate(event):
-            yield event
+    for item in stream:
+        if predicate(item):
+            yield item
 
 
-def limit_events(event_stream, limit=None):
+def limit(stream, limit=None):
     """
-    Limit the number of events from a stream.
+    Limit number of items in stream.
     
     Args:
-        event_stream: An iterable/generator of events
-        limit: Maximum number of events to yield (None for unlimited)
+        stream: Input stream/iterable
+        limit: Maximum items to yield (None for unlimited)
     """
     if limit is None:
-        yield from event_stream
+        yield from stream
     else:
-        for i, event in enumerate(event_stream):
+        for i, item in enumerate(stream):
             if i >= limit:
                 break
-            yield event
+            yield item
 
 
-def enrich_events(event_stream, with_nested_markets=False):
+def enrich_with_details(stream, with_nested_markets=False):
     """
-    Enrich events by fetching detailed data for each event ticker.
+    Enrich each event by fetching from detail endpoint (URL_B).
+    
+    Takes event tickers from stream and fetches full details.
     
     Args:
-        event_stream: An iterable/generator of events (with event_ticker field)
-        with_nested_markets: If true, include markets within the event object
-    
-    Yields:
-        Full event data from the /events/{event_ticker} endpoint
+        stream: Stream of events with event_ticker field
+        with_nested_markets: Include markets in response
     """
-    for event in event_stream:
+    for event in stream:
         event_ticker = event.get("event_ticker")
         if event_ticker:
-            detailed_event = fetch_event_by_ticker(event_ticker, with_nested_markets)
-            yield detailed_event
+            detailed_data = fetch_from_event_detail(event_ticker, with_nested_markets)
+            yield detailed_data
 
 
-def is_sports(event):
-    """Predicate to check if an event is in the Sports category."""
+def map(stream, transform_fn):
+    """
+    Map/transform each item in stream.
+    
+    Args:
+        stream: Input stream/iterable
+        transform_fn: Function to transform each item
+    """
+    for item in stream:
+        yield transform_fn(item)
+
+
+# ============================================================================
+# PREDICATES - Reusable filter conditions
+# ============================================================================
+
+def is_sports_event(event):
+    """Check if event is in Sports category."""
     return event.get("category") == "Sports"
-
-
-def stream_sports_events():
-    """
-    Generator that streams only Sports category events from Kalshi.
-    Composed from stream_events() and filter_events().
-    """
-    return filter_events(stream_events(), is_sports)
 
 
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
-    MAX_EVENTS = 10 
+    MAX_EVENTS = 10
     
-    # Compose: stream sports events -> enrich with detailed data -> limit
-    events = limit_events(
-        enrich_events(
-            stream_sports_events(),
-            with_nested_markets=True
-        ),
-        limit=MAX_EVENTS
-    )
+    stream = stream_from_events_list()
+    stream = filter(stream, is_sports_event)
+    stream = limit(stream, limit=MAX_EVENTS)
+    stream = enrich_with_details(stream, with_nested_markets=True)
     
-    for event in events:
+    for event in stream:
         print(json.dumps(event, indent=2))
-        print()  # blank line between events
+        print()
