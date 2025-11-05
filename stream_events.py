@@ -4,6 +4,27 @@ import json
 BASE_URL = "https://api.elections.kalshi.com/trade-api/v2/events"
 
 
+def fetch_event_by_ticker(event_ticker, with_nested_markets=False):
+    """
+    Fetch detailed event data by event ticker.
+    
+    Args:
+        event_ticker: The event ticker to fetch
+        with_nested_markets: If true, include markets within the event object
+    
+    Returns:
+        Full event data from the API
+    """
+    url = f"{BASE_URL}/{event_ticker}"
+    params = {}
+    if with_nested_markets:
+        params["with_nested_markets"] = "true"
+    
+    resp = requests.get(url, params=params, timeout=10)
+    resp.raise_for_status()
+    return resp.json()
+
+
 def fetch_page(cursor=None):
     """Fetch one page from Kalshi /events."""
     params = {}
@@ -62,6 +83,24 @@ def limit_events(event_stream, limit=None):
             yield event
 
 
+def enrich_events(event_stream, with_nested_markets=False):
+    """
+    Enrich events by fetching detailed data for each event ticker.
+    
+    Args:
+        event_stream: An iterable/generator of events (with event_ticker field)
+        with_nested_markets: If true, include markets within the event object
+    
+    Yields:
+        Full event data from the /events/{event_ticker} endpoint
+    """
+    for event in event_stream:
+        event_ticker = event.get("event_ticker")
+        if event_ticker:
+            detailed_event = fetch_event_by_ticker(event_ticker, with_nested_markets)
+            yield detailed_event
+
+
 def is_sports(event):
     """Predicate to check if an event is in the Sports category."""
     return event.get("category") == "Sports"
@@ -77,10 +116,16 @@ def stream_sports_events():
 
 if __name__ == "__main__":
     # Configure how many events to print (None for all)
-    MAX_EVENTS = 1
+    MAX_EVENTS = 10 
     
-    # Compose: stream sports events with a limit
-    events = limit_events(stream_sports_events(), limit=MAX_EVENTS)
+    # Compose: stream sports events -> enrich with detailed data -> limit
+    events = limit_events(
+        enrich_events(
+            stream_sports_events(),
+            with_nested_markets=True
+        ),
+        limit=MAX_EVENTS
+    )
     
     for event in events:
         print(json.dumps(event, indent=2))
